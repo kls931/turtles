@@ -8,7 +8,34 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(wastdr)
+wastdr_setup(
+  api_url = Sys.getenv("WASTD_API_URL"), 
+  api_token = Sys.getenv("WASTD_API_TOKEN"))
+```
+## Downloading data
+```{r download_data, eval=F}
+tnejson <- get_wastd('turtle-nest-encounters')
+tne <- parse_turtle_nest_encounters(tnejson)
+aejson <- get_wastd('animal-encounters')
+ae <- parse_animal_encounters(aejson)
+save.image("~/Projects/turtles/data/data.RData")
+```
+
+## Data
+Raw data contains all observations:
+```{r resume_from_saved_data}
 load("~/Projects/turtles/data/data.RData")
+```
+
+```{r show_json}
+# listviewer::jsonedit(aejson)
+# listviewer::jsonedit(tnejson)
+```
+
+Parsed data is tabular:
+```{r show_dt}
+DT::datatable(head(ae, n = 100))
+DT::datatable(head(tne, n = 100))
 ```
 
 ## R Markdown

@@ -1,19 +1,31 @@
 ---
 title: "Test workbook"
-author: "Kesia"
+author: "Kesia Savill and Dept Biodiversity, Conservation and Attractions WA"
 date: "`r Sys.time()`"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, message=F}
 knitr::opts_chunk$set(echo = TRUE)
 library(wastdr)
+library(dplyr)
+library(lubridate)
+library(leaflet)
 wastdr_setup(
   api_url = Sys.getenv("WASTD_API_URL"), 
   api_token = Sys.getenv("WASTD_API_TOKEN"))
 ```
 ## Downloading data
 ```{r download_data, eval=F}
+filter_to_end2016 <- . %>% dplyr::filter(
+  date > dmy("17/11/2016"), 
+  date < dmy("31/12/2016"))
+
+filter_to_end2017 <- . %>% dplyr::filter(
+  date > dmy("17/11/2017"), 
+  date < dmy("31/12/2017"))
+
+filter_tagging <- . %>% dplyr::filter(encounter_type == "tagging")
 
 if (file.exists("data/tnejson.Rda")){
   load("data/tnejson.Rda")
@@ -40,13 +52,27 @@ if (file.exists("data/aejson.Rda")){
 }
 ae <- parse_animal_encounters(aejson)
 
+tracks2016 <- tne %>% filter_to_end2016
+tracks2017 <- tne %>% filter_to_end2017
+
+tags2016 <- ae %>% filter_to_end2016 %>% filter_tagging
+tags2017 <- ae %>% filter_to_end2017 %>% filter_tagging
+
+
 save.image("data/data.RData")
 ```
+
+Note: Once `wastdr::parse_*_encounter` supports area and site ID and names, 
+the data should be filtered to exclude training data from the training area around
+the accommodation.
+
+TODO: Florian to import 2017 tagging to `WAStD` from `WAMTRAM2`. 
+`tags2017` are incomplete pending import from `WAMTRAM2`.
 
 ## Data
 Raw data contains all observations:
 ```{r resume_from_saved_data}
-load("~/Projects/turtles/data/data.RData")
+load("data/data.RData")
 ```
 
 ```{r show_json}
@@ -64,3 +90,86 @@ DT::datatable(head(tne, n = 100))
 
 * [Example workbook](http://rpubs.com/florian_mayer/tracks)
 * [wastdr homepage](https://parksandwildlife.github.io/wastdr/)
+* [wastdr usage examples](http://rpubs.com/florian_mayer/turtles-wastdr)
+
+# Map
+
+```{r mapping_helpers}
+species_colours <- tibble::tibble(
+    species = c(
+    "cheloniidae-fam",
+    "chelonia-mydas",
+    "eretmochelys-imbricata",
+    "natator-depressus",
+    "corolla-corolla",
+    "lepidochelys-olivacea",
+    "caretta-caretta"    
+    ),
+    species_colours = c(
+    "gray",
+    "green",
+    "darkblue",
+    "beige",
+    "pink",
+    "darkgreen",
+    "orange"
+    )
+)
+
+nest_type_text <- tibble::tibble(
+    nest_type = c(
+        "hatched-nest", 
+        "successful-crawl",
+        "track-not-assessed",
+        "track-unsure",
+        "nest",
+        "false-crawl"),
+    nest_type_text = c(
+        "NH", 
+        "T+N",
+        "T+?",
+        "N?",
+        "N",
+        "T")
+)
+
+add_lookups <- . %>% 
+    dplyr::left_join(species_colours, by="species") %>%
+    dplyr::left_join(nest_type_text, by="nest_type")
+
+tracks_map <- function(track_data) {
+  l <- leaflet::leaflet(width=800, height=600) %>% 
+    addProviderTiles("Esri.WorldImagery", group = "Aerial") %>%
+    addProviderTiles("OpenStreetMap.Mapnik", group = "Place names") %>%
+    clearBounds()
+  
+  tracks.df <-  track_data %>% split(track_data$species)
+  
+  names(tracks.df) %>%
+    purrr::walk( function(df) {
+      l <<- l %>%
+        addAwesomeMarkers(
+          data = tracks.df[[df]],
+          lng = ~longitude, lat=~latitude,
+          icon = leaflet::makeAwesomeIcon(
+            text = ~nest_type_text,
+            markerColor = ~species_colours),
+          label=~paste(date, nest_age, species, nest_type),
+          popup=~paste(date, nest_age, species, nest_type),
+          group = df
+        )
+    })
+  
+  l %>%
+    addLayersControl(
+      baseGroups = c("Aerial", "Place names"),
+      overlayGroups = names(tracks.df),
+      options = layersControlOptions(collapsed = FALSE)
+    )
+}
+```
+
+
+```{r}
+tracks2016 %>% add_lookups %>% tracks_map
+```

@@ -173,3 +173,7 @@ tracks_map <- function(track_data) {
 ```{r}
 tracks2016 %>% add_lookups %>% tracks_map
 ```
+
+```{r}
+tracks2017 %>% add_lookups %>% tracks_map
+```

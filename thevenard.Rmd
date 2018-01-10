@@ -342,6 +342,17 @@ tracks2016 %>%
   # filter(species=="chelonia-mydas") %>%
   tracks_ts
 ```
+```{r track_plot_2017}
+tracks2017 %>% 
+  # filter(species=="chelonia-mydas") %>%
+  tracks_ts
+```
+
+```{r track_plot_2017}
+tracks2016 %>% 
+  # filter(species=="chelonia-mydas") %>%
+  tracks_ts
+```
 
 ### Season summaries: helpers
 

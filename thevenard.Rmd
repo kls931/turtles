@@ -333,17 +333,28 @@ tracks_ts <- . %>%
 
 ```{r track_summary_2016}
 tracks2016 %>% 
-  # filter(species=="chelonia-mydas") %>%
+  # filter(species=="natator-depressus") %>%
   daily_summary()
 ```
 
 
 ```{r track_plot_2016}
 tracks2016 %>% 
-  # filter(species=="chelonia-mydas") %>%
+  # filter(species=="natator-depressus") %>%
   tracks_ts
 ```
 
+### Tracks for 2017
+```{r track_summary_2017}
+tracks2017 %>% 
+  # filter(species=="natator-depressus") %>%
+  daily_summary()
+```
+```{r track_plot_2017}
+tracks2017 %>% 
+  # filter(species=="natator-depressus") %>%
+  tracks_ts
+```
 ### Season summaries: helpers
 
 ```{r summary_helpers}

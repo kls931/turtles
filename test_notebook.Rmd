@@ -1,7 +1,7 @@
 ---
 title: "Test workbook"
 author: "Kesia"
-date: "14 November 2017"
+date: "`r Sys.time()`"
 output: html_document
 ---
 
@@ -14,11 +14,33 @@ wastdr_setup(
 ```
 ## Downloading data
 ```{r download_data, eval=F}
-tnejson <- get_wastd('turtle-nest-encounters')
+
+if (file.exists("data/tnejson.Rda")){
+  load("data/tnejson.Rda")
+} else {
+  tnejson <- wastdr::get_wastd(
+    'turtle-nest-encounters', 
+    query = list(taxon = "Cheloniidae", 
+                 format = "json",
+                 area=17))
+  save(tnejson, file = "data/tnejson.Rda")
+}
+
 tne <- parse_turtle_nest_encounters(tnejson)
-aejson <- get_wastd('animal-encounters')
+
+if (file.exists("data/aejson.Rda")){
+  load("data/aejson.Rda")
+} else {
+  aejson <- wastdr::get_wastd(
+    'animal-encounters', 
+    query = list(taxon = "Cheloniidae", 
+                 format = "json",
+                 area=17))
+  save(aejson, file = "data/aejson.Rda")
+}
 ae <- parse_animal_encounters(aejson)
-save.image("~/Projects/turtles/data/data.RData")
+
+save.image("data/data.RData")
 ```
 
 ## Data
@@ -28,8 +50,8 @@ load("~/Projects/turtles/data/data.RData")
 ```
 
 ```{r show_json}
-# listviewer::jsonedit(aejson)
-# listviewer::jsonedit(tnejson)
+# listviewer::jsonedit(aejson$features)
+# listviewer::jsonedit(tnejson$features)
 ```
 
 Parsed data is tabular:
@@ -42,23 +64,3 @@ DT::datatable(head(tne, n = 100))
 
 * [Example workbook](http://rpubs.com/florian_mayer/tracks)
 * [wastdr homepage](https://parksandwildlife.github.io/wastdr/)
-
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
-```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

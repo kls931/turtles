@@ -19,9 +19,9 @@ library(dplyr)
 library(lubridate)
 library(leaflet)
 library(ggplot2)
-wastdr_setup(
-  api_url = Sys.getenv("WASTD_API_URL"), 
-  api_token = Sys.getenv("WASTD_API_TOKEN"))
+# wastdr_setup(
+  # api_url = Sys.getenv("WASTD_API_URL"), 
+  # api_token = Sys.getenv("WASTD_API_TOKEN"))
 ```
 
 # Data
@@ -38,6 +38,8 @@ filter_to_end2017 <- . %>% dplyr::filter(
   date < dmy("31/12/2017"))
 
 filter_tagging <- . %>% dplyr::filter(encounter_type == "tagging")
+
+exclude_training <- . %>% dplyr::filter(site_id!=30, species!="corolla-corolla")
 
 if (file.exists("data/tnejson.Rda")){
   load("data/tnejson.Rda")
@@ -64,12 +66,11 @@ if (file.exists("data/aejson.Rda")){
 }
 ae <- parse_animal_encounters(aejson)
 
-tracks2016 <- tne %>% filter_to_end2016
-tracks2017 <- tne %>% filter_to_end2017
+tracks2016 <- tne %>% filter_to_end2016 %>% exclude_training
+tracks2017 <- tne %>% filter_to_end2017 %>% exclude_training
 
-tags2016 <- ae %>% filter_to_end2016 %>% filter_tagging
-tags2017 <- ae %>% filter_to_end2017 %>% filter_tagging
-
+tags2016 <- ae %>% filter_to_end2016 %>% filter_tagging %>% exclude_training
+tags2017 <- ae %>% filter_to_end2017 %>% filter_tagging %>% exclude_training
 
 save.image("data/data.RData")
 ```

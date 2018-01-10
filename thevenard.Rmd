@@ -182,6 +182,37 @@ tracks_map <- function(track_data) {
       options = layersControlOptions(collapsed = FALSE)
     )
 }
+
+tags_map <- function(tag_data) {
+  l <- leaflet::leaflet(width=800, height=600) %>% 
+    addProviderTiles("Esri.WorldImagery", group = "Aerial") %>%
+    addProviderTiles("OpenStreetMap.Mapnik", group = "Place names") %>%
+    clearBounds()
+  
+  tags.df <-  tag_data %>% split(tag_data$species)
+  
+  names(tags.df) %>%
+    purrr::walk( function(df) {
+      l <<- l %>%
+        addAwesomeMarkers(
+          data = tags.df[[df]],
+          lng = ~longitude, lat=~latitude,
+          icon = leaflet::makeAwesomeIcon(
+            text = ~name,
+            markerColor = ~species_colours),
+          label=~paste(date, name, species),
+          popup=~paste(date, name, species),
+          group = df
+        )
+    })
+  
+  l %>%
+    addLayersControl(
+      baseGroups = c("Aerial", "Place names"),
+      overlayGroups = names(tags.df),
+      options = layersControlOptions(collapsed = FALSE)
+    )
+}
 ```
 
 ### A simple map
@@ -256,6 +287,15 @@ leaflet::leaflet(width=800, height=600) %>%
       overlayGroups = c("Tags 2016", "Tags 2017"),
       options = layersControlOptions(collapsed = FALSE)
     )
+```
+
+### Tags split by species
+
+This map makes less sense, as tagging does not need to be split up by species
+as much as the far more numerous tracks.
+
+```{r}
+tags2016 %>% dplyr::left_join(species_colours, by="species") %>% tags_map
 ```
 
 # Data summaries

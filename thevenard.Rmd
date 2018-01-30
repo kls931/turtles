@@ -16,13 +16,20 @@ knitr::opts_chunk$set(echo = TRUE)  # Show code
 # knitr::opts_chunk$set(echo = FALSE) # Don't show code
 library(wastdr)
 library(dplyr)
+library(magrittr)
 library(lubridate)
 library(leaflet)
+library(mapview)
 library(ggplot2)
-# wastdr_setup(
-  # api_url = Sys.getenv("WASTD_API_URL"), 
-  # api_token = Sys.getenv("WASTD_API_TOKEN"))
+wastdr::wastdr_setup()
+# wastdr::wastdr_settings()
 ```
+
+# Attribution
+* Data sharing agreement with DBCA
+* DBCA contacts
+* Data point of truth is WA Sea Turtle Database 
+  [WAStD](https://strandings.dpaw.wa.gov.au/), https://strandings.dpaw.wa.gov.au/ 
 
 # Data
 
@@ -54,33 +61,12 @@ if (file.exists("data/tnejson.Rda")){
 
 tne <- parse_turtle_nest_encounters(tnejson)
 
-if (file.exists("data/aejson.Rda")){
-  load("data/aejson.Rda")
-} else {
-  aejson <- wastdr::get_wastd(
-    'animal-encounters', 
-    query = list(taxon = "Cheloniidae", 
-                 format = "json",
-                 area=17))
-  save(aejson, file = "data/aejson.Rda")
-}
-ae <- parse_animal_encounters(aejson)
-
 tracks2016 <- tne %>% filter_to_end2016 %>% exclude_training
 tracks2017 <- tne %>% filter_to_end2017 %>% exclude_training
-
-tags2016 <- ae %>% filter_to_end2016 %>% filter_tagging %>% exclude_training
-tags2017 <- ae %>% filter_to_end2017 %>% filter_tagging %>% exclude_training
 
 save.image("data/data.RData")
 ```
 
-Note: Once `wastdr::parse_*_encounter` supports area and site ID and names, 
-the data should be filtered to exclude training data from the training area around
-the accommodation.
-
-TODO: Florian to import 2017 tagging to `WAStD` from `WAMTRAM2`. 
-`tags2017` are incomplete pending import from `WAMTRAM2`.
 
 Raw data contains all observations:
 ```{r resume_from_saved_data}
@@ -90,13 +76,11 @@ load("data/data.RData")
 ### Inspecting the data
 
 ```{r show_json}
-# listviewer::jsonedit(aejson$features)
 # listviewer::jsonedit(tnejson$features)
 ```
 
 Parsed data is tabular:
 ```{r show_dt}
-DT::datatable(head(ae, n = 100))
 DT::datatable(head(tne, n = 100))
 ```
 
@@ -183,37 +167,6 @@ tracks_map <- function(track_data) {
       options = layersControlOptions(collapsed = FALSE)
     )
 }
-
-tags_map <- function(tag_data) {
-  l <- leaflet::leaflet(width=800, height=600) %>% 
-    addProviderTiles("Esri.WorldImagery", group = "Aerial") %>%
-    addProviderTiles("OpenStreetMap.Mapnik", group = "Place names") %>%
-    clearBounds()
-  
-  tags.df <-  tag_data %>% split(tag_data$species)
-  
-  names(tags.df) %>%
-    purrr::walk( function(df) {
-      l <<- l %>%
-        addAwesomeMarkers(
-          data = tags.df[[df]],
-          lng = ~longitude, lat=~latitude,
-          icon = leaflet::makeAwesomeIcon(
-            text = ~name,
-            markerColor = ~species_colours),
-          label=~paste(date, name, species),
-          popup=~paste(date, name, species),
-          group = df
-        )
-    })
-  
-  l %>%
-    addLayersControl(
-      baseGroups = c("Aerial", "Place names"),
-      overlayGroups = names(tags.df),
-      options = layersControlOptions(collapsed = FALSE)
-    )
-}
 ```
 
 ### A simple map
@@ -247,56 +200,42 @@ leaflet::leaflet(width=800, height=600) %>%
 tracks2016 %>% add_lookups %>% tracks_map
 ```
 
+### Nests 2016
+
+```{r maps_nests_2016}
+all_nests_2016 <- tracks2016 %>% 
+  add_lookups %>% 
+  filter(nest_type %in% c("successful-crawl", "nest", "hatched-nest"))
+
+fresh_nests_2016 <- tracks2016 %>% 
+  add_lookups %>% 
+  filter(nest_type == "successful-crawl")
+
+fresh_nests_2016 %>% 
+  tracks_map %T>% 
+  mapshot(., file = "nests_fresh_2016.png")
+```
+
 ### Tracks 2017
 
 ```{r maps_tracks_2017}
 tracks2017 %>% add_lookups %>% tracks_map
 ```
 
-### Tags 2016 and 2017
+### Nests 2017
 
-```{r simple_tags_2016}
-simple_tags_2016 <- tags2016 %>% dplyr::left_join(species_colours, by="species")
-simple_tags_2017 <- tags2017 %>% dplyr::left_join(species_colours, by="species")
+```{r maps_nests_2017}
+all_nests_2017 <- tracks2017 %>% 
+  add_lookups %>% 
+  filter(nest_type %in% c("successful-crawl", "nest", "hatched-nest"))
 
-leaflet::leaflet(width=800, height=600) %>% 
-    addProviderTiles("Esri.WorldImagery", group = "Aerial") %>%
-    addProviderTiles("OpenStreetMap.Mapnik", group = "Place names") %>%
-    clearBounds() %>%
-    leaflet::addAwesomeMarkers(
-          data = simple_tags_2016,
-          lng = ~longitude, lat=~latitude,
-          icon = leaflet::makeAwesomeIcon(
-            text = ~name, 
-            markerColor = ~species_colours),
-          label=~paste(date, name, species),
-          popup=~paste(date, name, species),
-          group = "Tags 2016"
-        ) %>%
-    leaflet::addAwesomeMarkers(
-          data = simple_tags_2017,
-          lng = ~longitude, lat=~latitude,
-          icon = leaflet::makeAwesomeIcon(
-            text = ~name, 
-            markerColor = ~species_colours),
-          label=~paste(date, name, species),
-          popup=~paste(date, name, species),
-          group = "Tags 2017"
-        ) %>%
-    leaflet::addLayersControl(
-      baseGroups = c("Aerial", "Place names"),
-      overlayGroups = c("Tags 2016", "Tags 2017"),
-      options = layersControlOptions(collapsed = FALSE)
-    )
-```
+fresh_nests_2017 <- tracks2017 %>% 
+  add_lookups %>% 
+  filter(nest_type == "successful-crawl")
 
-### Tags split by species
-
-This map makes less sense, as tagging does not need to be split up by species
-as much as the far more numerous tracks.
-
-```{r}
-tags2016 %>% dplyr::left_join(species_colours, by="species") %>% tags_map
+fresh_nests_2017 %>% 
+  tracks_map %T>% 
+  mapshot(., file = "nests_fresh_2017.png")
 ```
 
 # Data summaries
@@ -315,18 +254,22 @@ daily_summary <- . %>%
     tidyr::spread(nest_type, n, fill=0) %>%
     DT::datatable(.)
 
-tracks_ts <- . %>% 
+tracks_ts <- function(data, title="Abundance"){
+    data %>%
     daily_species_by_type %>% 
     {ggplot(data=., aes(x = date, y = n, colour = nest_type)) + 
             geom_point() + 
-            geom_smooth(method = "auto") +
+            # geom_smooth(method = "auto") +
             # geom_line() +
+            ylim(0, NA) +
             scale_x_date(breaks = scales::pretty_breaks(),
                          labels = scales::date_format("%d %b %Y")) +
+            labs(colour="Track/Nest Type") +
             xlab("Date") +
             ylab("Number counted per day") +
-            ggtitle("Nesting activity") +
+            ggtitle(title) +
             theme_light()}
+}
 ```
 
 ### Tracks 2016
@@ -340,8 +283,23 @@ tracks2016 %>%
 
 ```{r track_plot_2016}
 tracks2016 %>% 
+  tracks_ts(title="All species: tracks and nests") %T>% 
+  ggsave("data/2016_all_species_all_types.png", ., width=7, height=5, dpi=300)
+
+tracks2016 %>% 
+  filter(species=="natator-depressus") %>%
+  tracks_ts(title="Flatbacks: tracks and nests") %T>% 
+  ggsave("data/2016_flatbacks_all_types.png", ., width=7, height=5, dpi=300)
+
+all_nests_2016 %>% 
   # filter(species=="natator-depressus") %>%
-  tracks_ts
+  tracks_ts(title="All species: fresh, incubating and hatched nests") %T>% 
+  ggsave("data/2016_all_species_all_nests.png", ., width=7, height=5, dpi=300)
+
+fresh_nests_2016 %>% 
+  # filter(species=="natator-depressus") %>%
+  tracks_ts(title="All species: only fresh nests") %T>% 
+  ggsave("data/2016_all_species_fresh_nests.png", ., width=7, height=5, dpi=300)
 ```
 
 ### Tracks for 2017
@@ -350,10 +308,26 @@ tracks2017 %>%
   # filter(species=="natator-depressus") %>%
   daily_summary()
 ```
+
 ```{r track_plot_2017}
 tracks2017 %>% 
+  tracks_ts(title="All species: tracks and nests") %T>% 
+  ggsave("data/2017_all_species_all_types.png", ., width=7, height=5, dpi=300)
+
+tracks2017 %>% 
+  filter(species=="natator-depressus") %>%
+  tracks_ts(title="Flatbacks: tracks and nests") %T>% 
+  ggsave("data/2017_flatbacks_all_types.png", ., width=7, height=5, dpi=300)
+
+all_nests_2017 %>% 
   # filter(species=="natator-depressus") %>%
-  tracks_ts
+  tracks_ts(title="All species: fresh, incubating and hatched nests") %T>% 
+  ggsave("data/2017_all_species_all_nests.png", ., width=7, height=5, dpi=300)
+
+fresh_nests_2017 %>% 
+  # filter(species=="natator-depressus") %>%
+  tracks_ts(title="All species: only fresh nests") %T>% 
+  ggsave("data/2017_all_species_fresh_nests.png", ., width=7, height=5, dpi=300)
 ```
 ### Season summaries: helpers
 
@@ -370,17 +344,11 @@ species_day_summary_tracks <- . %>%
   group_by(species, date) %>% 
   tally %>%
   dplyr::summarize("mean" = mean(n) %>% round(digits = 2),
-                   "SD" = sd(n) %>% round(digits = 2),
+                   "SE" = sd(n)/sqrt(length(n)), # %>% round(digits = 2),
+                   "SD" = sd(n), # %>% round(digits = 2),
                    "min" = min(n),
                    "max" = max(n))
 
-species_day_summary_tags <- . %>% 
-  group_by(species, date) %>% 
-  tally %>%
-  dplyr::summarize("mean" = mean(n) %>% round(digits = 2),
-                   "SD" = sd(n) %>% round(digits = 2),
-                   "min" = min(n),
-                   "max" = max(n))
 ```
 
 Caveat: The data are trimmed down to only the first half of the nesting season 
@@ -407,19 +375,6 @@ tracks2016 %>% species_day_summary_tracks %>% knitr::kable(.)
 tracks2017 %>% species_day_summary_tracks %>% knitr::kable(.)
 ```
 
-### Daily stats: tags 2016
-
-```{r tags_daily_summary_2016}
-tags2016 %>% species_day_summary_tags %>% knitr::kable(.)
-```
-
-#### Daily stats: tags 2017
-
-Caveat: data still missing. 
-
-```{r tags_daily_summary_2017}
-tags2017 %>% species_day_summary_tags %>% knitr::kable(.)
-```
 # Questions
 
 ## Has the population size changed between 2016 and 2017?
